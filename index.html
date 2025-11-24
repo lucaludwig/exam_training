@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Quiz</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        #quiz-container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.1);
+            width: 95%;
+            max-width: 600px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #progress-bar-container {
+            width: 100%;
+            background-color: #e9ebee;
+            border-radius: 4px;
+            height: 8px;
+            margin-bottom: 15px;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #1877f2;
+            border-radius: 4px;
+            transition: width 0.3s ease-in-out;
+        }
+        h2 {
+            font-size: 18px;
+            margin: 0 0 15px 0;
+            color: #1c1e21;
+        }
+        .question-text {
+            font-size: 16px;
+            line-height: 1.4;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+        }
+        .options {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .options li {
+            margin-bottom: 10px;
+        }
+        .options label {
+            display: block;
+            padding: 12px 15px;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .options input[type="radio"] {
+            display: none;
+        }
+        .options input[type="radio"]:checked + label {
+            background-color: #e7f3ff;
+            border-color: #1877f2;
+        }
+        #feedback {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+            font-size: 14px;
+        }
+        #feedback.correct {
+            background-color: #42b72a;
+            color: white;
+        }
+        #feedback.incorrect {
+            background-color: #fa3e3e;
+            color: white;
+        }
+        #explanation {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            background-color: #f0f2f5;
+            display: none;
+            font-size: 14px;
+            border: 1px solid #e9ebee;
+        }
+        #navigation {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background-color: #1877f2;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #166fe5;
+        }
+        button:disabled {
+            background-color: #a0bdf5;
+            cursor: not-allowed;
+        }
+        #score {
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="quiz-container">
+        <div id="progress-bar-container">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="score"></div>
+        <h2 id="question-number"></h2>
+        <p id="question" class="question-text"></p>
+        <ul id="options" class="options"></ul>
+        <div id="feedback"></div>
+        <div id="explanation"></div>
+        <div id="navigation">
+            <button id="check-btn">Überprüfen</button>
+            <button id="next-btn" style="display: none;">Nächste Frage</button>
+        </div>
+    </div>
+
+    <script src="questions.js"></script>
+    <script>
+        const questionEl = document.getElementById('question');
+        const questionNumberEl = document.getElementById('question-number');
+        const optionsEl = document.getElementById('options');
+        const checkBtn = document.getElementById('check-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const feedbackEl = document.getElementById('feedback');
+        const explanationEl = document.getElementById('explanation');
+        const scoreEl = document.getElementById('score');
+        const progressBar = document.getElementById('progress-bar');
+
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+
+        function loadQuiz() {
+            // Shuffle quiz data array
+            if (currentQuestionIndex === 0) {
+                for (let i = quizData.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [quizData[i], quizData[j]] = [quizData[j], quizData[i]];
+                }
+            }
+
+            const currentQuestion = quizData[currentQuestionIndex];
+            questionNumberEl.innerText = `Frage ${currentQuestionIndex + 1} von ${quizData.length}`;
+            questionEl.innerText = currentQuestion.question;
+            optionsEl.innerHTML = '';
+            currentQuestion.options.forEach((option, index) => {
+                const li = document.createElement('li');
+                const radioId = `option${index}`;
+                const letter = String.fromCharCode(65 + index);
+                // Handle multiple correct answers for questions with "Choose two" etc.
+                const isMultiSelect = currentQuestion.answer.length > 1;
+                const inputType = isMultiSelect ? 'checkbox' : 'radio';
+
+                li.innerHTML = `
+                    <input type="${inputType}" name="option" id="${radioId}" value="${letter}">
+                    <label for="${radioId}">${option}</label>
+                `;
+                optionsEl.appendChild(li);
+            });
+            updateScore();
+            updateProgressBar();
+            feedbackEl.style.display = 'none';
+            explanationEl.style.display = 'none';
+            checkBtn.style.display = 'block';
+            nextBtn.style.display = 'none';
+            checkBtn.disabled = false;
+        }
+
+        function updateScore() {
+            scoreEl.innerText = `Punktestand: ${score} / ${currentQuestionIndex}`;
+        }
+        
+        function updateProgressBar() {
+            const progress = ((currentQuestionIndex) / quizData.length) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        function checkAnswer() {
+            const selectedOptions = document.querySelectorAll('input[name="option"]:checked');
+            if (selectedOptions.length === 0) {
+                alert('Bitte wähle eine Antwort aus.');
+                return;
+            }
+
+            const currentQuestion = quizData[currentQuestionIndex];
+            let selectedAnswers = [];
+            selectedOptions.forEach(option => {
+                selectedAnswers.push(option.value);
+            });
+            
+            const isCorrect = selectedAnswers.sort().join('') === [...currentQuestion.answer].sort().join('');
+
+            if (isCorrect) {
+                score++;
+                feedbackEl.innerText = 'Richtig!';
+                feedbackEl.className = 'correct';
+            } else {
+                feedbackEl.innerText = `Falsch. Die richtige Antwort ist ${currentQuestion.answer}.`;
+                feedbackEl.className = 'incorrect';
+            }
+
+            feedbackEl.style.display = 'block';
+            explanationEl.innerText = "Explanation:\n" + currentQuestion.explanation;
+            explanationEl.style.display = 'block';
+            
+            updateScore();
+            checkBtn.style.display = 'none';
+            nextBtn.style.display = 'block';
+            if (currentQuestionIndex === quizData.length - 1) {
+                nextBtn.innerText = 'Quiz beenden';
+            }
+        }
+        
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < quizData.length) {
+                loadQuiz();
+            } else {
+                endQuiz();
+            }
+        }
+
+        function endQuiz() {
+             progressBar.style.width = `100%`;
+             const finalScore = (score / quizData.length) * 100;
+             questionEl.innerText = 'Quiz beendet!';
+             questionNumberEl.innerText = '';
+             optionsEl.innerHTML = `Dein Endergebnis: ${score} von ${quizData.length} Fragen richtig (${finalScore.toFixed(2)}%).`;
+             document.getElementById('navigation').innerHTML = '';
+             scoreEl.innerText = '';
+        }
+
+        checkBtn.addEventListener('click', checkAnswer);
+        nextBtn.addEventListener('click', nextQuestion);
+
+        loadQuiz();
+    </script>
+</body>
+</html>
